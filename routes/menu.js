@@ -5,6 +5,7 @@ const { put, del } = require('@vercel/blob');
 const { dbGet, dbAll, dbRun } = require('../database');
 const { authenticateToken } = require('../middleware/auth');
 const { removeBackground } = require('../services/bgRemover');
+const { generate3DModel } = require('../services/meshGenerator');
 
 const router = express.Router();
 
@@ -45,9 +46,9 @@ router.post('/upload', authenticateToken, upload.single('image'), async (req, re
 
     const imageUrl = blob.url;
 
-    // Insert menu item
+    // Insert menu item (is_processing = 1 while bg removal runs)
     const result = await dbRun(
-      'INSERT INTO menu_items (cafe_id, name, description, price, category, original_image, processed_image, is_processing) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+      'INSERT INTO menu_items (cafe_id, name, description, price, category, original_image, processed_image, is_processing) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
       [
         req.user.id,
         name,
@@ -55,15 +56,20 @@ router.post('/upload', authenticateToken, upload.single('image'), async (req, re
         parseFloat(price),
         category || 'General',
         imageUrl,
-        imageUrl,  // use same image since no bg removal on serverless
+        imageUrl,  // placeholder until bg removal finishes
       ]
     );
 
     const menuItemId = result.lastInsertRowid;
     const menuItem = await dbGet('SELECT * FROM menu_items WHERE id = ?', [menuItemId]);
 
+    // Trigger background removal + 3D generation in background (non-blocking)
+    // These run AFTER the response is sent so the user doesn't wait
+    removeBackground(imageUrl, menuItemId).catch(console.error);
+    generate3DModel(imageUrl, menuItemId).catch(console.error);
+
     res.status(201).json({
-      message: 'Menu item uploaded successfully!',
+      message: 'Menu item uploaded! Processing image...',
       menuItem
     });
   } catch (err) {
@@ -96,7 +102,7 @@ router.get('/public/:slug', async (req, res) => {
     }
 
     const items = await dbAll(
-      'SELECT id, name, description, price, category, processed_image, original_image, is_processing FROM menu_items WHERE cafe_id = ? ORDER BY category, created_at DESC',
+      'SELECT id, name, description, price, category, processed_image, original_image, model_3d_url, is_processing FROM menu_items WHERE cafe_id = ? ORDER BY category, created_at DESC',
       [cafe.id]
     );
 

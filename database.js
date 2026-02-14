@@ -28,6 +28,7 @@ async function initDatabase() {
       category TEXT DEFAULT 'General',
       original_image TEXT NOT NULL,
       processed_image TEXT DEFAULT '',
+      model_3d_url TEXT DEFAULT '',
       is_processing INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (cafe_id) REFERENCES cafes(id) ON DELETE CASCADE
