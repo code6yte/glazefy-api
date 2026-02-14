@@ -30,17 +30,20 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Import routes
 const authRoutes = require('./routes/auth');
 const menuRoutes = require('./routes/menu');
+const categoryRoutes = require('./routes/categories');
 
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/menu', menuRoutes);
+app.use('/api/categories', categoryRoutes);
 
-// QR Code generation endpoint
+// ─── QR Code: One per business (full menu) ───
+
 app.get('/api/qrcode', authenticateToken, async (req, res) => {
   try {
-    const cafe = await dbGet('SELECT slug FROM cafes WHERE id = ?', [req.user.id]);
+    const cafe = await dbGet('SELECT slug, name FROM cafes WHERE id = ?', [req.user.id]);
     if (!cafe) {
-      return res.status(404).json({ error: 'Cafe not found' });
+      return res.status(404).json({ error: 'Business not found' });
     }
 
     const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -58,7 +61,8 @@ app.get('/api/qrcode', authenticateToken, async (req, res) => {
 
     res.json({
       qrCode: qrDataUrl,
-      menuUrl
+      menuUrl,
+      businessName: cafe.name,
     });
   } catch (err) {
     console.error('QR generation error:', err);
@@ -66,12 +70,12 @@ app.get('/api/qrcode', authenticateToken, async (req, res) => {
   }
 });
 
-// Download QR code as base64
+// Download QR code as PNG
 app.get('/api/qrcode/download', authenticateToken, async (req, res) => {
   try {
     const cafe = await dbGet('SELECT slug, name FROM cafes WHERE id = ?', [req.user.id]);
     if (!cafe) {
-      return res.status(404).json({ error: 'Cafe not found' });
+      return res.status(404).json({ error: 'Business not found' });
     }
 
     const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -87,7 +91,7 @@ app.get('/api/qrcode/download', authenticateToken, async (req, res) => {
       }
     });
 
-    const filename = `${cafe.name.replace(/\s+/g, '-')}-qrcode.png`;
+    const filename = `${cafe.name.replace(/\s+/g, '-')}-menu-qrcode.png`;
     res.set({
       'Content-Type': 'image/png',
       'Content-Disposition': `attachment; filename="${filename}"`,
@@ -97,70 +101,6 @@ app.get('/api/qrcode/download', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('QR download error:', err);
     res.status(500).json({ error: 'Failed to generate QR code' });
-  }
-});
-
-// QR code for a specific menu item
-app.get('/api/qrcode/item/:itemId', authenticateToken, async (req, res) => {
-  try {
-    const item = await dbGet(
-      'SELECT mi.id, mi.name, c.slug FROM menu_items mi JOIN cafes c ON mi.cafe_id = c.id WHERE mi.id = ? AND mi.cafe_id = ?',
-      [req.params.itemId, req.user.id]
-    );
-    if (!item) {
-      return res.status(404).json({ error: 'Menu item not found' });
-    }
-
-    const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
-    const itemUrl = `${baseUrl}/menu/${item.slug}?item=${item.id}`;
-
-    const qrDataUrl = await QRCode.toDataURL(itemUrl, {
-      width: 400,
-      margin: 2,
-      color: { dark: '#1a1a2e', light: '#ffffff' }
-    });
-
-    res.json({
-      qrCode: qrDataUrl,
-      itemUrl,
-      itemName: item.name,
-    });
-  } catch (err) {
-    console.error('Item QR error:', err);
-    res.status(500).json({ error: 'Failed to generate item QR code' });
-  }
-});
-
-// Download per-item QR code as PNG
-app.get('/api/qrcode/item/:itemId/download', authenticateToken, async (req, res) => {
-  try {
-    const item = await dbGet(
-      'SELECT mi.id, mi.name, c.slug FROM menu_items mi JOIN cafes c ON mi.cafe_id = c.id WHERE mi.id = ? AND mi.cafe_id = ?',
-      [req.params.itemId, req.user.id]
-    );
-    if (!item) {
-      return res.status(404).json({ error: 'Menu item not found' });
-    }
-
-    const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
-    const itemUrl = `${baseUrl}/menu/${item.slug}?item=${item.id}`;
-
-    const qrBuffer = await QRCode.toBuffer(itemUrl, {
-      width: 800,
-      margin: 2,
-      color: { dark: '#1a1a2e', light: '#ffffff' }
-    });
-
-    const filename = `${item.name.replace(/\s+/g, '-')}-qrcode.png`;
-    res.set({
-      'Content-Type': 'image/png',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': qrBuffer.length,
-    });
-    res.send(qrBuffer);
-  } catch (err) {
-    console.error('Item QR download error:', err);
-    res.status(500).json({ error: 'Failed to generate item QR code' });
   }
 });
 
@@ -206,7 +146,7 @@ if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`
   ╔══════════════════════════════════════════════════════════════╗
-  ║                    AR Cafe Menu Server                        ║
+  ║                    Glazefy Server                             ║
   ╠══════════════════════════════════════════════════════════════╣
   ║  Server running on: http://localhost:${PORT}                    ║
   ║  Dashboard:          http://localhost:${PORT}/dashboard         ║

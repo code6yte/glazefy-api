@@ -22,27 +22,31 @@ async function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS menu_items (
+    CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cafe_id INTEGER NOT NULL,
       name TEXT NOT NULL,
       description TEXT DEFAULT '',
+      icon TEXT DEFAULT '',
+      sort_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (cafe_id) REFERENCES cafes(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS menu_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cafe_id INTEGER NOT NULL,
+      category_id INTEGER,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
       price REAL NOT NULL,
-      category TEXT DEFAULT 'General',
       original_image TEXT NOT NULL,
       processed_image TEXT DEFAULT '',
       model_3d_url TEXT DEFAULT '',
       is_processing INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (cafe_id) REFERENCES cafes(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS categories (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      cafe_id INTEGER NOT NULL,
-      name TEXT NOT NULL,
-      sort_order INTEGER DEFAULT 0,
-      FOREIGN KEY (cafe_id) REFERENCES cafes(id) ON DELETE CASCADE
+      FOREIGN KEY (cafe_id) REFERENCES cafes(id) ON DELETE CASCADE,
+      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     );
   `);
 }
