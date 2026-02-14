@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Cafe Menu</title>
+  <link rel="stylesheet" href="/css/ar-menu.css">
+  <!-- Model Viewer for WebAR -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Loading State -->
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Loading menu...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="error hidden">
+      <div class="error-icon">!</div>
+      <h2>Menu Not Found</h2>
+      <p id="error-message">The cafe menu you're looking for doesn't exist.</p>
+    </div>
+
+    <!-- Main Content -->
+    <div id="menu-content" class="hidden">
+      <!-- Header -->
+      <header class="cafe-header">
+        <h1 id="cafe-name">Cafe Name</h1>
+        <p id="cafe-description" class="cafe-description"></p>
+      </header>
+
+      <!-- Category Tabs -->
+      <nav class="category-nav" id="category-nav">
+        <div class="category-tabs" id="category-tabs"></div>
+      </nav>
+
+      <!-- Menu Grid -->
+      <main class="menu-grid" id="menu-grid"></main>
+
+      <!-- AR Modal -->
+      <div id="ar-modal" class="ar-modal hidden">
+        <div class="ar-modal-content">
+          <button class="ar-close" id="ar-close">&times;</button>
+          <h2 id="ar-item-name">Item Name</h2>
+          <p class="ar-item-price" id="ar-item-price">$0.00</p>
+          <p class="ar-item-description" id="ar-item-description"></p>
+
+          <div class="ar-viewer-container">
+            <!-- For images with transparent background, we can display them in AR-like manner -->
+            <div class="ar-display">
+              <img id="ar-image" src="" alt="Menu item">
+              <div class="ar-overlay">
+                <span class="ar-badge">AR View</span>
+              </div>
+            </div>
+
+            <!-- AR Controls -->
+            <div class="ar-controls">
+              <button id="ar-fullscreen" class="ar-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+                Fullscreen
+              </button>
+              <button id="ar-place" class="ar-btn primary">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 8v8m-4-4h8"/>
+                </svg>
+                Place on Table
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fullscreen AR View -->
+      <div id="fullscreen-ar" class="fullscreen-ar hidden">
+        <button class="fullscreen-close" id="fullscreen-close">&times;</button>
+        <div class="fullscreen-content">
+          <img id="fullscreen-image" src="" alt="Menu item">
+          <div class="fullscreen-info">
+            <h3 id="fullscreen-name"></h3>
+            <p id="fullscreen-price"></p>
+          </div>
+        </div>
+        <div class="ar-instructions">
+          <p>Point your camera at a flat surface to view this item in AR</p>
+          <p class="ar-tip">Tip: Works best in well-lit environments</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/ar-menu.js"></script>
+</body>
+</html>
