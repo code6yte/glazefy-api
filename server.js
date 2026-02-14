@@ -88,7 +88,7 @@ app.get('/api/qrcode', authenticateToken, async (req, res) => {
   }
 });
 
-// Download colorful QR code as PNG
+// Download colorful QR code as SVG
 app.get('/api/qrcode/download', authenticateToken, async (req, res) => {
   try {
     const cafe = await dbGet('SELECT slug, name, qr_theme FROM cafes WHERE id = ?', [req.user.id]);
@@ -100,9 +100,9 @@ app.get('/api/qrcode/download', authenticateToken, async (req, res) => {
 
     const { buffer } = await generateColorfulQR(menuUrl, theme, 800);
 
-    const filename = `${cafe.name.replace(/\s+/g, '-')}-menu-qrcode.png`;
+    const filename = `${cafe.name.replace(/\s+/g, '-')}-menu-qrcode.svg`;
     res.set({
-      'Content-Type': 'image/png',
+      'Content-Type': 'image/svg+xml',
       'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Length': buffer.length,
     });
