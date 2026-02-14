@@ -2,93 +2,95 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AR Cafe Menu</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Menu — Glazefy</title>
   <link rel="stylesheet" href="/css/ar-menu.css">
-  <!-- Model Viewer for WebAR -->
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <!-- Google model-viewer for WebXR AR -->
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
   <div id="app">
-    <!-- Loading State -->
-    <div id="loading" class="loading">
+    <!-- Loading -->
+    <div id="loading" class="loading-screen">
       <div class="spinner"></div>
       <p>Loading menu...</p>
     </div>
 
-    <!-- Error State -->
-    <div id="error" class="error hidden">
-      <div class="error-icon">!</div>
+    <!-- Error -->
+    <div id="error" class="error-screen hidden">
+      <div class="error-icon">😕</div>
       <h2>Menu Not Found</h2>
-      <p id="error-message">The cafe menu you're looking for doesn't exist.</p>
+      <p id="error-message">This business menu doesn't exist.</p>
     </div>
 
-    <!-- Main Content -->
+    <!-- Menu Content -->
     <div id="menu-content" class="hidden">
       <!-- Header -->
-      <header class="cafe-header">
-        <h1 id="cafe-name">Cafe Name</h1>
-        <p id="cafe-description" class="cafe-description"></p>
+      <header class="menu-header">
+        <div class="header-info">
+          <h1 id="cafe-name"></h1>
+          <p id="cafe-description"></p>
+        </div>
       </header>
 
-      <!-- Category Tabs -->
-      <nav class="category-nav" id="category-nav">
-        <div class="category-tabs" id="category-tabs"></div>
-      </nav>
+      <!-- Category Navigation -->
+      <nav class="category-nav" id="category-nav"></nav>
 
-      <!-- Menu Grid -->
-      <main class="menu-grid" id="menu-grid"></main>
+      <!-- Menu Sections (grouped by category) -->
+      <main id="menu-sections"></main>
+    </div>
 
-      <!-- AR Modal -->
-      <div id="ar-modal" class="ar-modal hidden">
-        <div class="ar-modal-content">
-          <button class="ar-close" id="ar-close">&times;</button>
-          <h2 id="ar-item-name">Item Name</h2>
-          <p class="ar-item-price" id="ar-item-price">$0.00</p>
-          <p class="ar-item-description" id="ar-item-description"></p>
+    <!-- AR Detail Modal -->
+    <div id="ar-modal" class="modal-overlay hidden">
+      <div class="item-detail">
+        <button class="close-btn" id="modal-close">&times;</button>
 
-          <div class="ar-viewer-container">
-            <!-- For images with transparent background, we can display them in AR-like manner -->
-            <div class="ar-display">
-              <img id="ar-image" src="" alt="Menu item">
-              <div class="ar-overlay">
-                <span class="ar-badge">AR View</span>
-              </div>
-            </div>
-
-            <!-- AR Controls -->
-            <div class="ar-controls">
-              <button id="ar-fullscreen" class="ar-btn">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-                </svg>
-                Fullscreen
-              </button>
-              <button id="ar-place" class="ar-btn primary">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M12 8v8m-4-4h8"/>
-                </svg>
-                Place on Table
-              </button>
-            </div>
-          </div>
+        <!-- 3D Viewer (shown when model_3d_url exists) -->
+        <div id="viewer-3d" class="viewer-container hidden">
+          <model-viewer
+            id="model-viewer"
+            ar
+            ar-modes="webxr scene-viewer quick-look"
+            ar-scale="auto"
+            camera-controls
+            touch-action="pan-y"
+            auto-rotate
+            shadow-intensity="1"
+            environment-image="neutral"
+            loading="eager"
+            style="width: 100%; height: 300px; background: #0a0a1a;"
+          >
+            <button slot="ar-button" class="ar-launch-btn">
+              📱 View in Your Space
+            </button>
+          </model-viewer>
         </div>
-      </div>
 
-      <!-- Fullscreen AR View -->
-      <div id="fullscreen-ar" class="fullscreen-ar hidden">
-        <button class="fullscreen-close" id="fullscreen-close">&times;</button>
-        <div class="fullscreen-content">
-          <img id="fullscreen-image" src="" alt="Menu item">
-          <div class="fullscreen-info">
-            <h3 id="fullscreen-name"></h3>
-            <p id="fullscreen-price"></p>
-          </div>
+        <!-- Image fallback (shown when no 3D model) -->
+        <div id="viewer-image" class="viewer-container hidden">
+          <img id="detail-image" src="" alt="Product" class="detail-img">
         </div>
-        <div class="ar-instructions">
-          <p>Point your camera at a flat surface to view this item in AR</p>
-          <p class="ar-tip">Tip: Works best in well-lit environments</p>
+
+        <div class="detail-info">
+          <h2 id="detail-name"></h2>
+          <p id="detail-description" class="detail-desc"></p>
+          <div class="detail-footer">
+            <span id="detail-price" class="detail-price"></span>
+            <span id="detail-category" class="detail-category"></span>
+          </div>
+
+          <!-- AR Launch button for 3D items -->
+          <button id="launch-ar-btn" class="cta-ar-btn hidden">
+            <span class="ar-icon">📱</span>
+            View in AR — Place on Your Table
+          </button>
+
+          <!-- No 3D badge for image-only items -->
+          <div id="no-ar-badge" class="no-ar-info hidden">
+            <span>🖼️</span>
+            <span>Image preview only — 3D coming soon</span>
+          </div>
         </div>
       </div>
     </div>

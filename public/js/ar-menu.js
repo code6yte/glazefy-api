@@ -1,249 +1,250 @@
-// AR Cafe Menu - Client Side JavaScript
+// Glazefy AR Menu — Customer-facing
+// Uses the new category-grouped public API + model-viewer for real AR
 
 class ARMenuApp {
   constructor() {
     this.cafe = null;
-    this.menuItems = [];
-    this.categories = [];
-    this.activeCategory = 'all';
+    this.categories = []; // Array of { id, name, icon, items: [] }
+    this.allItems = [];
     this.currentItem = null;
-
     this.init();
   }
 
   async init() {
-    const slug = this.getSlugFromUrl();
-
-    if (!slug) {
-      this.showError('Invalid menu URL');
-      return;
-    }
-
+    const slug = this.getSlug();
+    if (!slug) return this.showError('Invalid menu URL');
     await this.fetchMenu(slug);
-    this.setupEventListeners();
+    this.setupListeners();
   }
 
-  getSlugFromUrl() {
-    const path = window.location.pathname;
-    const match = path.match(/\/menu\/([^\/]+)/);
-    return match ? match[1] : null;
+  getSlug() {
+    const m = window.location.pathname.match(/\/menu\/([^/]+)/);
+    return m ? m[1] : null;
   }
+
+  // ─── Fetch menu (grouped by category) ───
 
   async fetchMenu(slug) {
     try {
-      const response = await fetch(`/api/menu/public/${slug}`);
+      const res = await fetch(`/api/menu/public/${slug}`);
+      if (!res.ok) return this.showError(res.status === 404 ? 'Business not found' : 'Failed to load menu');
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          this.showError('Cafe not found');
-        } else {
-          this.showError('Failed to load menu');
-        }
-        return;
-      }
-
-      const data = await response.json();
+      const data = await res.json();
       this.cafe = data.cafe;
-      this.menuItems = data.menuItems;
-      this.categories = this.extractCategories(data.menuItems);
+      this.categories = data.categories || [];
+      this.allItems = this.categories.flatMap(c => c.items || []);
 
       this.render();
     } catch (err) {
-      console.error('Fetch error:', err);
+      console.error(err);
       this.showError('Failed to connect to server');
     }
   }
 
-  extractCategories(items) {
-    const cats = new Set();
-    items.forEach(item => cats.add(item.category));
-    return ['all', ...Array.from(cats)];
-  }
-
-  showError(message) {
+  showError(msg) {
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('error').classList.remove('hidden');
-    document.getElementById('error-message').textContent = message;
+    document.getElementById('error-message').textContent = msg;
   }
 
+  // ─── Render ───
+
   render() {
-    // Hide loading, show content
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('menu-content').classList.remove('hidden');
 
-    // Render cafe info
+    // Header
     document.getElementById('cafe-name').textContent = this.cafe.name;
     document.getElementById('cafe-description').textContent = this.cafe.description || '';
+    document.title = `${this.cafe.name} — Glazefy`;
 
-    // Render categories
-    this.renderCategories();
+    // Category pills (scrollable)
+    this.renderCategoryNav();
 
-    // Render menu items
-    this.renderMenuItems();
+    // Menu sections grouped by category
+    this.renderSections();
   }
 
-  renderCategories() {
-    const container = document.getElementById('category-tabs');
-
-    container.innerHTML = this.categories.map(cat => `
-      <button class="category-tab ${cat === this.activeCategory ? 'active' : ''}" data-category="${cat}">
-        ${cat === 'all' ? 'All Items' : cat}
-      </button>
-    `).join('');
-  }
-
-  renderMenuItems() {
-    const container = document.getElementById('menu-grid');
-    const filteredItems = this.activeCategory === 'all'
-      ? this.menuItems
-      : this.menuItems.filter(item => item.category === this.activeCategory);
-
-    if (filteredItems.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">🍽️</div>
-          <h3>No menu items yet</h3>
-          <p>Check back soon for delicious offerings!</p>
-        </div>
-      `;
+  renderCategoryNav() {
+    const nav = document.getElementById('category-nav');
+    if (this.categories.length <= 1) {
+      nav.classList.add('hidden');
       return;
     }
 
-    container.innerHTML = filteredItems.map(item => this.createMenuItemCard(item)).join('');
+    nav.innerHTML = this.categories.map(cat => `
+      <a href="#cat-${cat.id || 'other'}" class="cat-pill">
+        ${cat.icon ? `<span class="cat-icon">${cat.icon}</span>` : ''}
+        <span>${this.esc(cat.name)}</span>
+        <span class="cat-count">${(cat.items || []).length}</span>
+      </a>
+    `).join('');
   }
 
-  createMenuItemCard(item) {
-    const rawImg = item.processed_image && !item.is_processing
-      ? item.processed_image
-      : item.original_image;
-    const imageSrc = rawImg.startsWith('http') ? rawImg : `/${rawImg}`;
+  renderSections() {
+    const main = document.getElementById('menu-sections');
+    const noItems = this.allItems.length === 0;
 
-    const badge = item.is_processing
-      ? '<span class="processing-badge">Processing...</span>'
-      : '<span class="ar-badge">AR Ready</span>';
+    if (noItems) {
+      main.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🍽️</div>
+          <h3>Menu coming soon!</h3>
+          <p>Check back shortly for products.</p>
+        </div>`;
+      return;
+    }
+
+    main.innerHTML = this.categories.map(cat => {
+      const items = cat.items || [];
+      if (items.length === 0) return '';
+
+      return `
+        <section class="menu-section" id="cat-${cat.id || 'other'}">
+          <div class="section-header">
+            ${cat.icon ? `<span class="section-icon">${cat.icon}</span>` : ''}
+            <div>
+              <h2 class="section-title">${this.esc(cat.name)}</h2>
+              ${cat.description ? `<p class="section-desc">${this.esc(cat.description)}</p>` : ''}
+            </div>
+          </div>
+          <div class="items-grid">
+            ${items.map(item => this.renderCard(item, cat.name)).join('')}
+          </div>
+        </section>`;
+    }).join('');
+  }
+
+  renderCard(item, categoryName) {
+    const img = this.getImageUrl(item);
+    const has3D = !!item.model_3d_url;
+    const processing = item.is_processing;
 
     return `
-      <article class="menu-card" data-item-id="${item.id}">
-        <div class="menu-card-image">
-          <img src="${imageSrc}" alt="${item.name}" loading="lazy">
-          ${badge}
+      <article class="item-card" data-id="${item.id}">
+        <div class="card-image">
+          ${img ? `<img src="${img}" alt="${this.esc(item.name)}" loading="lazy">` : '<div class="no-img">📷</div>'}
+          ${has3D ? '<span class="badge-3d">3D</span>' : ''}
+          ${processing ? '<span class="badge-processing">⏳</span>' : ''}
         </div>
-        <div class="menu-card-info">
-          <h3>${this.escapeHtml(item.name)}</h3>
-          <p>${this.escapeHtml(item.description || '')}</p>
-          <div class="menu-card-footer">
-            <span class="menu-card-price">$${parseFloat(item.price).toFixed(2)}</span>
-            <button class="view-ar-btn" data-item-id="${item.id}">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-              </svg>
-              View in AR
-            </button>
+        <div class="card-body">
+          <h3 class="card-title">${this.esc(item.name)}</h3>
+          ${item.description ? `<p class="card-desc">${this.esc(item.description)}</p>` : ''}
+          <div class="card-footer">
+            <span class="card-price">$${parseFloat(item.price).toFixed(2)}</span>
+            ${has3D
+        ? '<button class="ar-btn" data-id="' + item.id + '">📱 View in AR</button>'
+        : '<button class="preview-btn" data-id="' + item.id + '">👁️ Preview</button>'
+      }
           </div>
         </div>
-      </article>
-    `;
+      </article>`;
   }
 
-  setupEventListeners() {
-    // Category tabs
-    document.getElementById('category-tabs').addEventListener('click', (e) => {
-      if (e.target.classList.contains('category-tab')) {
-        this.activeCategory = e.target.dataset.category;
-        this.renderCategories();
-        this.renderMenuItems();
+  getImageUrl(item) {
+    const raw = item.processed_image && !item.is_processing ? item.processed_image : item.original_image;
+    if (!raw) return null;
+    return raw.startsWith('http') ? raw : `/${raw}`;
+  }
+
+  // ─── Event Listeners ───
+
+  setupListeners() {
+    // Card clicks
+    document.getElementById('menu-sections').addEventListener('click', (e) => {
+      const btn = e.target.closest('.ar-btn, .preview-btn');
+      const card = e.target.closest('.item-card');
+      const id = btn ? btn.dataset.id : (card ? card.dataset.id : null);
+
+      if (id) {
+        const item = this.allItems.find(i => String(i.id) === String(id));
+        if (item) this.openDetail(item);
       }
     });
 
-    // Menu card clicks
-    document.getElementById('menu-grid').addEventListener('click', (e) => {
-      const card = e.target.closest('.menu-card');
-      const arBtn = e.target.closest('.view-ar-btn');
-
-      if (arBtn || card) {
-        const itemId = arBtn ? arBtn.dataset.itemId : card.dataset.itemId;
-        const item = this.menuItems.find(i => i.id == itemId);
-        if (item) {
-          this.openARModal(item);
-        }
-      }
-    });
-
-    // AR Modal
-    document.getElementById('ar-close').addEventListener('click', () => this.closeARModal());
+    // Close modal
+    document.getElementById('modal-close').addEventListener('click', () => this.closeDetail());
     document.getElementById('ar-modal').addEventListener('click', (e) => {
-      if (e.target.id === 'ar-modal') this.closeARModal();
+      if (e.target.id === 'ar-modal') this.closeDetail();
     });
 
-    // AR Controls
-    document.getElementById('ar-fullscreen').addEventListener('click', () => this.openFullscreenAR());
-    document.getElementById('ar-place').addEventListener('click', () => this.openFullscreenAR());
-
-    // Fullscreen AR
-    document.getElementById('fullscreen-close').addEventListener('click', () => this.closeFullscreenAR());
-    document.getElementById('fullscreen-ar').addEventListener('click', (e) => {
-      if (e.target.id === 'fullscreen-ar') this.closeFullscreenAR();
-    });
-
-    // Keyboard navigation
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        this.closeFullscreenAR();
-        this.closeARModal();
+    // Launch AR from detail
+    document.getElementById('launch-ar-btn').addEventListener('click', () => {
+      const mv = document.getElementById('model-viewer');
+      if (mv && mv.canActivateAR) {
+        mv.activateAR();
+      } else {
+        alert('AR is not supported on this device/browser. Try Chrome on Android or Safari on iOS.');
       }
+    });
+
+    // Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this.closeDetail();
     });
   }
 
-  openARModal(item) {
+  // ─── Detail Modal ───
+
+  openDetail(item) {
     this.currentItem = item;
+    const has3D = !!item.model_3d_url;
+    const img = this.getImageUrl(item);
 
-    const rawImg2 = item.processed_image && !item.is_processing
-      ? item.processed_image
-      : item.original_image;
-    const imageSrc = rawImg2.startsWith('http') ? rawImg2 : `/${rawImg2}`;
+    // Find category name
+    let catName = 'Uncategorized';
+    for (const cat of this.categories) {
+      if ((cat.items || []).some(i => i.id === item.id)) {
+        catName = cat.name;
+        break;
+      }
+    }
 
-    document.getElementById('ar-item-name').textContent = item.name;
-    document.getElementById('ar-item-price').textContent = `$${parseFloat(item.price).toFixed(2)}`;
-    document.getElementById('ar-item-description').textContent = item.description || '';
-    document.getElementById('ar-image').src = imageSrc;
+    // Item info
+    document.getElementById('detail-name').textContent = item.name;
+    document.getElementById('detail-description').textContent = item.description || '';
+    document.getElementById('detail-price').textContent = `$${parseFloat(item.price).toFixed(2)}`;
+    document.getElementById('detail-category').textContent = catName;
 
+    // 3D viewer
+    const viewer3d = document.getElementById('viewer-3d');
+    const viewerImg = document.getElementById('viewer-image');
+
+    if (has3D) {
+      const mv = document.getElementById('model-viewer');
+      mv.src = item.model_3d_url;
+      // If there's a poster image, set it
+      if (img) mv.poster = img;
+      viewer3d.classList.remove('hidden');
+      viewerImg.classList.add('hidden');
+      document.getElementById('launch-ar-btn').classList.remove('hidden');
+      document.getElementById('no-ar-badge').classList.add('hidden');
+    } else {
+      viewer3d.classList.add('hidden');
+      viewerImg.classList.remove('hidden');
+      document.getElementById('detail-image').src = img || '';
+      document.getElementById('launch-ar-btn').classList.add('hidden');
+      document.getElementById('no-ar-badge').classList.remove('hidden');
+    }
+
+    // Show modal
     document.getElementById('ar-modal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
   }
 
-  closeARModal() {
+  closeDetail() {
     document.getElementById('ar-modal').classList.add('hidden');
     document.body.style.overflow = '';
+    // Stop model-viewer loading
+    const mv = document.getElementById('model-viewer');
+    if (mv) mv.src = '';
   }
 
-  openFullscreenAR() {
-    if (!this.currentItem) return;
-
-    const rawImg3 = this.currentItem.processed_image && !this.currentItem.is_processing
-      ? this.currentItem.processed_image
-      : this.currentItem.original_image;
-    const imageSrc = rawImg3.startsWith('http') ? rawImg3 : `/${rawImg3}`;
-
-    document.getElementById('fullscreen-image').src = imageSrc;
-    document.getElementById('fullscreen-name').textContent = this.currentItem.name;
-    document.getElementById('fullscreen-price').textContent = `$${parseFloat(this.currentItem.price).toFixed(2)}`;
-
-    document.getElementById('fullscreen-ar').classList.remove('hidden');
-    this.closeARModal();
-  }
-
-  closeFullscreenAR() {
-    document.getElementById('fullscreen-ar').classList.add('hidden');
-  }
-
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+  esc(text) {
+    const d = document.createElement('div');
+    d.textContent = text || '';
+    return d.innerHTML;
   }
 }
 
-// Initialize app when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  new ARMenuApp();
-});
+document.addEventListener('DOMContentLoaded', () => new ARMenuApp());
