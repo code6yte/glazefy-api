@@ -19,6 +19,7 @@ async function initDatabase() {
       business_type TEXT DEFAULT 'cafe',
       phone TEXT DEFAULT '',
       address TEXT DEFAULT '',
+      qr_theme TEXT DEFAULT 'purple',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 

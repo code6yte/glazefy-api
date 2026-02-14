@@ -1,9 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const QRCode = require('qrcode');
-const { initDatabase, dbGet } = require('./database');
+const { initDatabase, dbGet, dbRun } = require('./database');
 const { authenticateToken } = require('./middleware/auth');
+const { generateColorfulQR, QR_THEMES, THEME_NAMES } = require('./services/qrGenerator');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,32 +37,50 @@ app.use('/api/auth', authRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/categories', categoryRoutes);
 
-// ─── QR Code: One per business (full menu) ───
+// ─── QR Code Themes ───
 
+// List available themes
+app.get('/api/qrcode/themes', (req, res) => {
+  const themes = THEME_NAMES.map(key => ({
+    id: key,
+    name: QR_THEMES[key].name,
+    colors: QR_THEMES[key].gradient,
+  }));
+  res.json({ themes });
+});
+
+// Set owner's preferred theme
+app.put('/api/qrcode/theme', authenticateToken, async (req, res) => {
+  try {
+    const { theme } = req.body;
+    if (!theme || !THEME_NAMES.includes(theme)) {
+      return res.status(400).json({ error: `Theme must be one of: ${THEME_NAMES.join(', ')}` });
+    }
+    await dbRun('UPDATE cafes SET qr_theme = ? WHERE id = ?', [theme, req.user.id]);
+    res.json({ message: 'QR theme updated', theme });
+  } catch (err) {
+    console.error('Theme update error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Generate colorful QR code (uses owner's saved theme, or ?theme= override)
 app.get('/api/qrcode', authenticateToken, async (req, res) => {
   try {
-    const cafe = await dbGet('SELECT slug, name FROM cafes WHERE id = ?', [req.user.id]);
-    if (!cafe) {
-      return res.status(404).json({ error: 'Business not found' });
-    }
+    const cafe = await dbGet('SELECT slug, name, qr_theme FROM cafes WHERE id = ?', [req.user.id]);
+    if (!cafe) return res.status(404).json({ error: 'Business not found' });
 
     const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
     const menuUrl = `${baseUrl}/menu/${cafe.slug}`;
+    const theme = req.query.theme || cafe.qr_theme || 'purple';
 
-    // Generate QR code as data URL
-    const qrDataUrl = await QRCode.toDataURL(menuUrl, {
-      width: 400,
-      margin: 2,
-      color: {
-        dark: '#1a1a2e',
-        light: '#ffffff'
-      }
-    });
+    const { dataUrl } = await generateColorfulQR(menuUrl, theme, 400);
 
     res.json({
-      qrCode: qrDataUrl,
+      qrCode: dataUrl,
       menuUrl,
       businessName: cafe.name,
+      theme,
     });
   } catch (err) {
     console.error('QR generation error:', err);
@@ -70,34 +88,25 @@ app.get('/api/qrcode', authenticateToken, async (req, res) => {
   }
 });
 
-// Download QR code as PNG
+// Download colorful QR code as PNG
 app.get('/api/qrcode/download', authenticateToken, async (req, res) => {
   try {
-    const cafe = await dbGet('SELECT slug, name FROM cafes WHERE id = ?', [req.user.id]);
-    if (!cafe) {
-      return res.status(404).json({ error: 'Business not found' });
-    }
+    const cafe = await dbGet('SELECT slug, name, qr_theme FROM cafes WHERE id = ?', [req.user.id]);
+    if (!cafe) return res.status(404).json({ error: 'Business not found' });
 
     const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
     const menuUrl = `${baseUrl}/menu/${cafe.slug}`;
+    const theme = req.query.theme || cafe.qr_theme || 'purple';
 
-    // Generate QR as buffer and send as download
-    const qrBuffer = await QRCode.toBuffer(menuUrl, {
-      width: 800,
-      margin: 2,
-      color: {
-        dark: '#1a1a2e',
-        light: '#ffffff'
-      }
-    });
+    const { buffer } = await generateColorfulQR(menuUrl, theme, 800);
 
     const filename = `${cafe.name.replace(/\s+/g, '-')}-menu-qrcode.png`;
     res.set({
       'Content-Type': 'image/png',
       'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': qrBuffer.length,
+      'Content-Length': buffer.length,
     });
-    res.send(qrBuffer);
+    res.send(buffer);
   } catch (err) {
     console.error('QR download error:', err);
     res.status(500).json({ error: 'Failed to generate QR code' });
