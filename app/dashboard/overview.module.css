@@ -1,0 +1,138 @@
+.welcome {
+    margin-bottom: 32px;
+}
+
+.welcome h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.statsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 36px;
+}
+
+.statCard {
+    text-align: center;
+    padding: 28px 20px;
+}
+
+.statIcon {
+    font-size: 32px;
+    margin-bottom: 12px;
+}
+
+.statNumber {
+    font-size: 32px;
+    font-weight: 800;
+}
+
+.statLabel {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-top: 4px;
+    font-weight: 500;
+}
+
+.sectionTitle {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.actionsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 36px;
+}
+
+.actionCard {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 28px 24px;
+    border-radius: var(--radius-lg);
+    transition: all 0.2s ease;
+    color: white;
+}
+
+.actionCard:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+.actionIcon {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+
+.actionTitle {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.actionSub {
+    font-size: 13px;
+    opacity: 0.85;
+}
+
+.recentList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.recentItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+}
+
+.recentInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.recentName {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.recentCategory {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.recentRight {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.recentPrice {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary-light);
+}
+
+.empty {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.emptyIcon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.empty h3 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}

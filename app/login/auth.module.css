@@ -1,0 +1,91 @@
+.authPage {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+    background:
+        radial-gradient(ellipse at 20% 50%, rgba(108, 92, 231, 0.05) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(0, 206, 201, 0.04) 0%, transparent 50%),
+        var(--bg);
+}
+
+.backLink {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.backLink:hover {
+    color: var(--text);
+}
+
+.authCard {
+    background: var(--bg-main);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 40px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: var(--shadow-lg);
+}
+
+.authHeader {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.authLogo {
+    display: inline-block;
+    color: var(--primary);
+    font-size: 32px;
+    margin-bottom: 16px;
+}
+
+.authHeader h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.authHeader p {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.authForm {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.error {
+    padding: 12px 16px;
+    background: rgba(255, 118, 117, 0.1);
+    border: 1px solid rgba(255, 118, 117, 0.2);
+    border-radius: var(--radius-md);
+    color: var(--error);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.authSwitch {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.authSwitch a {
+    color: var(--primary-light);
+    font-weight: 600;
+}
+
+.authSwitch a:hover {
+    text-decoration: underline;
+}
