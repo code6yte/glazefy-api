@@ -100,6 +100,70 @@ app.get('/api/qrcode/download', authenticateToken, async (req, res) => {
   }
 });
 
+// QR code for a specific menu item
+app.get('/api/qrcode/item/:itemId', authenticateToken, async (req, res) => {
+  try {
+    const item = await dbGet(
+      'SELECT mi.id, mi.name, c.slug FROM menu_items mi JOIN cafes c ON mi.cafe_id = c.id WHERE mi.id = ? AND mi.cafe_id = ?',
+      [req.params.itemId, req.user.id]
+    );
+    if (!item) {
+      return res.status(404).json({ error: 'Menu item not found' });
+    }
+
+    const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
+    const itemUrl = `${baseUrl}/menu/${item.slug}?item=${item.id}`;
+
+    const qrDataUrl = await QRCode.toDataURL(itemUrl, {
+      width: 400,
+      margin: 2,
+      color: { dark: '#1a1a2e', light: '#ffffff' }
+    });
+
+    res.json({
+      qrCode: qrDataUrl,
+      itemUrl,
+      itemName: item.name,
+    });
+  } catch (err) {
+    console.error('Item QR error:', err);
+    res.status(500).json({ error: 'Failed to generate item QR code' });
+  }
+});
+
+// Download per-item QR code as PNG
+app.get('/api/qrcode/item/:itemId/download', authenticateToken, async (req, res) => {
+  try {
+    const item = await dbGet(
+      'SELECT mi.id, mi.name, c.slug FROM menu_items mi JOIN cafes c ON mi.cafe_id = c.id WHERE mi.id = ? AND mi.cafe_id = ?',
+      [req.params.itemId, req.user.id]
+    );
+    if (!item) {
+      return res.status(404).json({ error: 'Menu item not found' });
+    }
+
+    const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
+    const itemUrl = `${baseUrl}/menu/${item.slug}?item=${item.id}`;
+
+    const qrBuffer = await QRCode.toBuffer(itemUrl, {
+      width: 800,
+      margin: 2,
+      color: { dark: '#1a1a2e', light: '#ffffff' }
+    });
+
+    const filename = `${item.name.replace(/\s+/g, '-')}-qrcode.png`;
+    res.set({
+      'Content-Type': 'image/png',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': qrBuffer.length,
+    });
+    res.send(qrBuffer);
+  } catch (err) {
+    console.error('Item QR download error:', err);
+    res.status(500).json({ error: 'Failed to generate item QR code' });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

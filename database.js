@@ -16,6 +16,9 @@ async function initDatabase() {
       slug TEXT UNIQUE NOT NULL,
       description TEXT DEFAULT '',
       logo TEXT DEFAULT '',
+      business_type TEXT DEFAULT 'cafe',
+      phone TEXT DEFAULT '',
+      address TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 

@@ -7,22 +7,61 @@ const { JWT_SECRET, authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Register a new cafe
+// ─── Validation helpers ───
+
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function validatePassword(password) {
+  if (password.length < 8) return 'Password must be at least 8 characters';
+  if (!/[A-Z]/.test(password)) return 'Password must contain an uppercase letter';
+  if (!/[0-9]/.test(password)) return 'Password must contain a number';
+  return null;
+}
+
+const BUSINESS_TYPES = ['cafe', 'restaurant', 'clothing', 'retail', 'bakery', 'other'];
+
+// ─── Register a new business ───
+
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, description } = req.body;
+    const { name, email, password, description, business_type, phone, address } = req.body;
 
+    // Required fields
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
     }
 
+    // Validate name length
+    if (name.trim().length < 2 || name.trim().length > 100) {
+      return res.status(400).json({ error: 'Business name must be 2-100 characters' });
+    }
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Validate password strength
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
+    }
+
+    // Validate business type
+    const bizType = business_type || 'cafe';
+    if (!BUSINESS_TYPES.includes(bizType)) {
+      return res.status(400).json({ error: `Business type must be one of: ${BUSINESS_TYPES.join(', ')}` });
+    }
+
     // Check if email already exists
-    const existing = await dbGet('SELECT id FROM cafes WHERE email = ?', [email]);
+    const existing = await dbGet('SELECT id FROM cafes WHERE email = ?', [email.toLowerCase().trim()]);
     if (existing) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    // Create slug from cafe name
+    // Create slug from business name
     let slug = slugify(name, { lower: true, strict: true });
     const slugExists = await dbGet('SELECT id FROM cafes WHERE slug = ?', [slug]);
     if (slugExists) {
@@ -30,30 +69,42 @@ router.post('/register', async (req, res) => {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Insert cafe
+    // Insert business
     const result = await dbRun(
-      'INSERT INTO cafes (name, email, password, slug, description) VALUES (?, ?, ?, ?, ?)',
-      [name, email, hashedPassword, slug, description || '']
+      'INSERT INTO cafes (name, email, password, slug, description, business_type, phone, address) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        name.trim(),
+        email.toLowerCase().trim(),
+        hashedPassword,
+        slug,
+        description || '',
+        bizType,
+        phone || '',
+        address || '',
+      ]
     );
 
     // Generate token
     const token = jwt.sign(
-      { id: result.lastInsertRowid, email, slug },
+      { id: result.lastInsertRowid, email: email.toLowerCase().trim(), slug },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
 
     res.status(201).json({
-      message: 'Cafe registered successfully',
+      message: 'Business registered successfully',
       token,
       cafe: {
         id: result.lastInsertRowid,
-        name,
-        email,
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
         slug,
-        description: description || ''
+        description: description || '',
+        business_type: bizType,
+        phone: phone || '',
+        address: address || '',
       }
     });
   } catch (err) {
@@ -62,7 +113,8 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login
+// ─── Login ───
+
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -71,7 +123,11 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const cafe = await dbGet('SELECT * FROM cafes WHERE email = ?', [email]);
+    if (!validateEmail(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    const cafe = await dbGet('SELECT * FROM cafes WHERE email = ?', [email.toLowerCase().trim()]);
     if (!cafe) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -95,7 +151,10 @@ router.post('/login', async (req, res) => {
         name: cafe.name,
         email: cafe.email,
         slug: cafe.slug,
-        description: cafe.description
+        description: cafe.description,
+        business_type: cafe.business_type,
+        phone: cafe.phone,
+        address: cafe.address,
       }
     });
   } catch (err) {
@@ -104,16 +163,17 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Get current cafe profile
+// ─── Get profile ───
+
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const cafe = await dbGet(
-      'SELECT id, name, email, slug, description, logo, created_at FROM cafes WHERE id = ?',
+      'SELECT id, name, email, slug, description, logo, business_type, phone, address, created_at FROM cafes WHERE id = ?',
       [req.user.id]
     );
 
     if (!cafe) {
-      return res.status(404).json({ error: 'Cafe not found' });
+      return res.status(404).json({ error: 'Business not found' });
     }
 
     res.json({ cafe });
@@ -123,26 +183,74 @@ router.get('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Update cafe profile
+// ─── Update profile ───
+
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, business_type, phone, address } = req.body;
 
-    if (name) {
-      await dbRun(
-        'UPDATE cafes SET name = ?, description = ? WHERE id = ?',
-        [name, description || '', req.user.id]
-      );
+    // Validate business type if provided
+    if (business_type && !BUSINESS_TYPES.includes(business_type)) {
+      return res.status(400).json({ error: `Business type must be one of: ${BUSINESS_TYPES.join(', ')}` });
     }
 
+    // Get current values
+    const current = await dbGet('SELECT * FROM cafes WHERE id = ?', [req.user.id]);
+    if (!current) {
+      return res.status(404).json({ error: 'Business not found' });
+    }
+
+    await dbRun(
+      'UPDATE cafes SET name = ?, description = ?, business_type = ?, phone = ?, address = ? WHERE id = ?',
+      [
+        name || current.name,
+        description !== undefined ? description : current.description,
+        business_type || current.business_type,
+        phone !== undefined ? phone : current.phone,
+        address !== undefined ? address : current.address,
+        req.user.id,
+      ]
+    );
+
     const cafe = await dbGet(
-      'SELECT id, name, email, slug, description, logo, created_at FROM cafes WHERE id = ?',
+      'SELECT id, name, email, slug, description, logo, business_type, phone, address, created_at FROM cafes WHERE id = ?',
       [req.user.id]
     );
 
     res.json({ message: 'Profile updated', cafe });
   } catch (err) {
     console.error('Update profile error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─── Change password ───
+
+router.put('/password', authenticateToken, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body;
+
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'Current and new password are required' });
+    }
+
+    const passwordError = validatePassword(new_password);
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
+    }
+
+    const cafe = await dbGet('SELECT password FROM cafes WHERE id = ?', [req.user.id]);
+    const valid = await bcrypt.compare(current_password, cafe.password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hashed = await bcrypt.hash(new_password, 12);
+    await dbRun('UPDATE cafes SET password = ? WHERE id = ?', [hashed, req.user.id]);
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    console.error('Password change error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
